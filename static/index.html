@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud XDR - URL Threat Analyzer</title>
+<link rel="stylesheet" href="/static/app.css">
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#121826; --panel2:#182033; --line:#243049; --text:#e6ebf5; --muted:#8a96ad;
+    --accent:#4dd4ac; --critical:#ff4d6d; --high:#ff8a3d; --medium:#f5c542; --low:#5aa9ff; --info:#8892a6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 18px 80px}
+  h1{font-size:22px;margin:0 0 4px} h1 span{color:var(--accent)}
+  .sub{color:var(--muted);margin:0 0 22px}
+  .bar{display:flex;gap:10px;flex-wrap:wrap}
+  input[type=text]{flex:1;min-width:240px;background:var(--panel);border:1px solid var(--line);color:var(--text);
+    padding:13px 14px;border-radius:10px;font-size:15px;outline:none}
+  input[type=text]:focus{border-color:var(--accent)}
+  button{background:var(--accent);color:#04201a;border:0;border-radius:10px;padding:0 22px;font-weight:700;font-size:15px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:wait}
+  .chips{margin:10px 0 0;color:var(--muted);font-size:13px}
+  .chip{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:3px 11px;margin-left:6px;cursor:pointer;font-size:13px}
+  .chip:hover{border-color:var(--accent)}
+  .err{color:var(--critical);margin-top:12px}
+
+  .steps{display:flex;gap:6px;margin:26px 0 8px;flex-wrap:wrap}
+  .step{flex:1;min-width:120px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--muted);font-size:13px}
+  .step b{display:block;color:var(--text);font-size:14px}
+  .step.active{border-color:var(--accent);color:var(--accent)} .step.active b{color:var(--accent)}
+  .step.done{color:#6fe0bf} .step.done b::before{content:"\2713  "}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:16px}
+  .card h2{margin:0 0 10px;font-size:15px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .top{display:grid;grid-template-columns:240px 1fr;gap:18px}
+  @media(max-width:720px){.top{grid-template-columns:1fr}}
+  .gauge{background:var(--panel2);border-radius:12px;padding:18px;text-align:center}
+  .score{font-size:56px;font-weight:800;line-height:1}
+  .lvl{display:inline-block;margin-top:8px;padding:3px 12px;border-radius:999px;font-weight:700;font-size:13px;color:#08111f}
+  .mini{margin-top:14px;color:var(--muted);font-size:13px}
+  .summary{font-size:15px}
+  .shot{margin-top:12px;max-width:100%;border:1px solid var(--line);border-radius:10px;display:block}
+
+  .f{border-top:1px solid var(--line);padding:11px 0}
+  .f:first-of-type{border-top:0}
+  .sev{display:inline-block;min-width:68px;text-align:center;border-radius:6px;font-size:11px;font-weight:800;padding:2px 6px;color:#08111f;margin-right:8px;text-transform:uppercase}
+  .tag{color:var(--muted);font-size:12px;margin-left:8px}
+  .detail{color:var(--muted);font-size:13.5px;margin:4px 0 0 76px}
+  .ev{font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;background:#0a0e16;border:1px solid var(--line);border-radius:6px;
+      padding:5px 8px;margin:5px 0 0 76px;color:#b8c3da;word-break:break-all}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  td,th{text-align:left;padding:6px 8px;border-top:1px solid var(--line);word-break:break-all}
+  th{color:var(--muted);font-weight:600;border-top:0}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+
+<!-- Header Nav Bar -->
+<header class="header-nav">
+  <div class="brand">
+    <span>XDR</span> URL Threat Analyzer
+    <span class="badge">Enterprise</span>
+  </div>
+  <nav class="nav-links">
+    <button class="nav-btn active" data-view="scanner">Scanner</button>
+    <button class="nav-btn" data-view="dashboard">Dashboard</button>
+    <button class="nav-btn" data-view="history">History</button>
+    <button class="nav-btn" data-view="compare">Compare</button>
+    <button class="nav-btn" data-view="bulk">Bulk Scans</button>
+    <button class="nav-btn" data-view="watchlists">Watchlists</button>
+    <button class="nav-btn" data-view="rules">Policies</button>
+    <button class="nav-btn" data-view="tokens">API Tokens</button>
+    <button class="nav-btn" data-view="admin">Admin</button>
+  </nav>
+  <div class="auth-bar" id="user-bar"></div>
+</header>
+
+<div class="wrap">
+
+  <!-- VIEW 1: SCANNER (Preserved original functionality) -->
+  <div id="view-scanner" class="view-container active">
+    <h1>URL <span>Sandbox</span> Analyzer</h1>
+    <p class="sub">Passive detonation in disposable browser isolation, records behavioral telemetry, and generates an explainable threat score.</p>
+
+    <form class="bar" id="form">
+      <input type="text" id="url" placeholder="https://example.com" autocomplete="off" spellcheck="false">
+      <button id="go" type="submit" style="height:46px">Analyze</button>
+    </form>
+    <div class="chips">Local demo targets:
+      <span class="chip" data-url="http://localhost:8001/safe">clean page</span>
+      <span class="chip" data-url="http://localhost:8001/gift">fake scam page</span>
+      <span style="margin-left:8px">(needs <code>ALLOW_PRIVATE=1</code> + <code>demo_server.py</code>)</span>
+    </div>
+    <div class="err hidden" id="err"></div>
+
+    <div class="steps hidden" id="steps">
+      <div class="step" data-s="queued"><b>Queued</b>job accepted</div>
+      <div class="step" data-s="detonating"><b>Detonation</b>browser opens URL</div>
+      <div class="step" data-s="analyzing"><b>Analysis</b>checks read evidence</div>
+      <div class="step" data-s="scoring"><b>Scoring</b>findings &rarr; score</div>
+      <div class="step" data-s="done"><b>Report</b>ready</div>
+    </div>
+
+    <div id="out"></div>
+  </div>
+
+  <!-- VIEW 2: DASHBOARD -->
+  <div id="view-dashboard" class="view-container">
+    <h1>Platform <span>Dashboard</span> & Telemetry</h1>
+    <p class="sub">Real database-backed scan metrics, risk distributions, and identified malicious domains.</p>
+  </div>
+
+  <!-- VIEW 3: SCAN HISTORY -->
+  <div id="view-history" class="view-container">
+    <h1>Scan <span>History</span> & Auditing</h1>
+    <p class="sub">Filter, search, inspect historical detonations, and trigger target rescans.</p>
+  </div>
+
+  <!-- VIEW 4: SCAN COMPARISON -->
+  <div id="view-compare" class="view-container">
+    <h1>Differential <span>Scan</span> Comparison</h1>
+    <p class="sub">Compare two scans of the same URL or domain to detect newly observed threat indicators and structural changes.</p>
+    <div class="card">
+      <div class="filter-row">
+        <input type="text" id="compare-base-id" class="filter-input" placeholder="Base Scan ID (e.g. 5a1b2c3d)">
+        <input type="text" id="compare-target-id" class="filter-input" placeholder="Compare Scan ID">
+        <button class="btn-sm btn-accent" onclick="runComparison()">Run Diff</button>
+      </div>
+    </div>
+    <div id="compare-results"></div>
+  </div>
+
+  <!-- VIEW 5: BULK SCANNER -->
+  <div id="view-bulk" class="view-container">
+    <h1>Bulk <span>CSV</span> Scanning</h1>
+    <p class="sub">Upload a CSV file containing URLs for asynchronous batch detonation (up to 500 URLs per batch).</p>
+    <div class="card">
+      <div class="filter-row">
+        <input type="file" id="bulk-file-input" accept=".csv,.txt" class="filter-input">
+        <button class="btn-sm btn-accent" onclick="uploadBulkCSV()">Upload & Process</button>
+      </div>
+      <div class="mini">File format: CSV with a "url" column or plaintext list of URLs. Max file size: 5 MB.</div>
+    </div>
+    <div class="card">
+      <h2>Batch Job Execution History</h2>
+      <div id="bulk-jobs-table-container"></div>
+    </div>
+  </div>
+
+  <!-- VIEW 6: WATCHLISTS -->
+  <div id="view-watchlists" class="view-container">
+    <h1>Recurring <span>Watchlists</span> & Schedules</h1>
+    <p class="sub">Continuously monitor suspicious domains or high-value infrastructure with automated recurring scans.</p>
+    <div class="card">
+      <h2>Add New Watchlist Item</h2>
+      <div class="filter-row">
+        <input type="text" id="wl-name" class="filter-input" placeholder="Target Name (e.g. Partner Portal)">
+        <input type="text" id="wl-target" class="filter-input" placeholder="Target URL or Domain" style="flex:1">
+        <select id="wl-interval" class="filter-input">
+          <option value="60">Every 1 Hour</option>
+          <option value="360">Every 6 Hours</option>
+          <option value="1440" selected>Every 24 Hours</option>
+          <option value="10080">Weekly</option>
+        </select>
+        <button class="btn-sm btn-accent" onclick="addWatchlistTarget()">Add Watchlist</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Active Target Schedules</h2>
+      <div id="watchlists-table-container"></div>
+    </div>
+  </div>
+
+  <!-- VIEW 7: RULES (ALLOWLIST & BLOCKLIST) -->
+  <div id="view-rules" class="view-container">
+    <h1>Security <span>Policies</span> (Allowlist & Blocklist)</h1>
+    <p class="sub">Precedence rule: Blocklist strictly overrides Allowlist. Targets on Blocklist are halted immediately.</p>
+    
+    <div class="card">
+      <h2>Add Policy Rule</h2>
+      <div class="filter-row">
+        <input type="text" id="blocklist-pattern" class="filter-input" placeholder="Block Domain (e.g. phish-login.com)" style="flex:1">
+        <input type="text" id="blocklist-reason" class="filter-input" placeholder="Enforcement Reason" style="flex:1">
+        <button class="btn-sm btn-danger" onclick="addRule('blocklist')">Add to Blocklist</button>
+      </div>
+      <div class="filter-row" style="margin-top:10px">
+        <input type="text" id="allowlist-pattern" class="filter-input" placeholder="Allow Domain (e.g. internal.corp)" style="flex:1">
+        <input type="text" id="allowlist-reason" class="filter-input" placeholder="Allowlist Reason" style="flex:1">
+        <button class="btn-sm btn-accent" onclick="addRule('allowlist')">Add to Allowlist</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Active Blocklist Entries</h2>
+      <div id="blocklist-table-container"></div>
+    </div>
+
+    <div class="card">
+      <h2>Active Allowlist Entries</h2>
+      <div id="allowlist-table-container"></div>
+    </div>
+  </div>
+
+  <!-- VIEW 8: API TOKENS -->
+  <div id="view-tokens" class="view-container">
+    <h1>XDR <span>API Tokens</span> & Automation</h1>
+    <p class="sub">Generate scoped API tokens for SIEM/SOAR/XDR integrations. Tokens are hashed (SHA-256) and displayed only once.</p>
+    <div class="card">
+      <h2>Generate New Token</h2>
+      <div class="filter-row">
+        <input type="text" id="token-name" class="filter-input" placeholder="Token Name (e.g. SOAR Pipeline Key)" style="flex:1">
+        <button class="btn-sm btn-accent" onclick="createApiToken()">Generate Token</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Active API Tokens</h2>
+      <div id="tokens-table-container"></div>
+    </div>
+  </div>
+
+  <!-- VIEW 9: ADMIN & AUDIT -->
+  <div id="view-admin" class="view-container">
+    <h1>Administrative <span>Console</span> & Audit Trail</h1>
+    <p class="sub">User authorization, invitation token generation, and immutable security audit logs.</p>
+    
+    <div class="card">
+      <h2>Create User Invitation Link</h2>
+      <div class="filter-row">
+        <input type="email" id="invite-email" class="filter-input" placeholder="User Email (e.g. analyst@corp.local)" style="flex:1">
+        <select id="invite-role" class="filter-input">
+          <option value="analyst" selected>Role: Analyst</option>
+          <option value="admin">Role: Administrator</option>
+        </select>
+        <button class="btn-sm btn-accent" onclick="createInvitation()">Issue Invitation</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Pending & Active Invitations</h2>
+      <div id="admin-invites-table"></div>
+    </div>
+
+    <div class="card">
+      <h2>User Directory & Access Control</h2>
+      <div id="admin-users-table"></div>
+    </div>
+
+    <div class="card">
+      <h2>Security Audit Log</h2>
+      <div id="admin-audit-table"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
